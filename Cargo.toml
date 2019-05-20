@@ -1,0 +1,10 @@
+[package]
+name = "gfx_learn"
+version = "0.1.0"
+authors = ["w"]
+edition = "2018"
+
+[dependencies]
+gfx = "0.18"
+glutin = "*"
+gfx_window_glutin = "*"
