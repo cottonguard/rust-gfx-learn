@@ -64,10 +64,19 @@ pub fn main() {
         &vertices, indices.as_slice()
     );
 
-    let mat = Transform {
+    let mut mat = Transform {
         transform: [
             [1., 0., 0., 0.],
-            [0., 0.67, 0., 0.],
+            [0., 1., 0., 0.],
+            [0., 0., 1., 0.],
+            [0., 0., 0., 1.]
+        ]
+    };
+
+    let mat2 = Transform {
+        transform: [
+            [0., 1., 0., 0.],
+            [1., 0., 0., 0.],
             [0., 0., 1., 0.],
             [0., 0., 0., 1.]
         ]
@@ -81,6 +90,8 @@ pub fn main() {
         out: main_color
     };
 
+    let _ = encoder.update_buffer(&data.transform, &[mat], 0);
+
     let mut running = true;
     let mut frame_count = FrameCount::new();
     frame_count.toggle_log(true);
@@ -90,7 +101,25 @@ pub fn main() {
             match event {
                 glutin::Event::WindowEvent { window_id: _, event } => match event {
                     KeyboardInput { device_id: _, input } => {
-                        // dbg!(input);
+                        if let glutin::KeyboardInput { virtual_keycode: Some(code), .. } = input {
+                            use glutin::VirtualKeyCode::*;
+                            let (vx, vy) = match code {
+                                Left => (0.01, 0.),
+                                Right => (-0.01, 0.),
+                                Up => (0., -0.01),
+                                Down => (0., 0.01),
+                                _ => (0., 0.)
+                            };
+
+                            mat.transform[0][3] += vx;
+                            mat.transform[1][3] += vy;
+                            let _ = encoder.update_buffer(&data.transform, &[mat], 0);
+
+                            match code {
+                                Z => { let _ = encoder.update_buffer(&data.transform, &[mat2], 0); }
+                                _ => {}
+                            }
+                       }
                     },
                     MouseInput {..} => {},
                     CursorMoved {
@@ -98,6 +127,8 @@ pub fn main() {
                         position: glutin::dpi::LogicalPosition{ x, y },
                         modifiers: _ 
                     } => {
+                        mat.transform[0][3] = (x / 1000.) as f32;
+                        mat.transform[1][3] = (-y / 1000.) as f32;
                         println!("x: {}, y: {}", x, y);
                     },
                     CloseRequested => { 
@@ -113,7 +144,6 @@ pub fn main() {
         });
 
         encoder.clear(&data.out, BLACK);
-        let _ = encoder.update_buffer(&data.transform, &[mat], 0);
         encoder.draw(&slice, &pso, &data);
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
