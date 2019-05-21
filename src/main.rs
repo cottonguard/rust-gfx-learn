@@ -1,3 +1,5 @@
+use gfx_learn::frame_count::*;
+
 #[macro_use]
 extern crate gfx;
 
@@ -15,8 +17,13 @@ gfx_defines! {
         color: [f32; 3] = "a_Color",
     }
 
+    constant Transform {
+        transform: [[f32; 4]; 4] = "u_Transform",
+    }
+
     pipeline pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
+        transform: gfx::ConstantBuffer<Transform> = "Transform",
         out: gfx::RenderTarget<ColorFormat> = "Target0",
     }
 }
@@ -57,23 +64,41 @@ pub fn main() {
         &vertices, indices.as_slice()
     );
 
+    let mat = Transform {
+        transform: [
+            [1., 0., 0., 0.],
+            [0., 0.67, 0., 0.],
+            [0., 0., 1., 0.],
+            [0., 0., 0., 1.]
+        ]
+    };
+
+    let transform_buffer = factory.create_constant_buffer(1);
+
     let mut data = pipe::Data {
         vbuf: vertex_buffer,
+        transform: transform_buffer,
         out: main_color
     };
 
     let mut running = true;
-    let mut frame_count = 0;
-    let mut prev_frame_count = 0;
-    let start_time = std::time::Instant::now();
-    let mut next_time = start_time;
+    let mut frame_count = FrameCount::new();
+    frame_count.toggle_log(true);
     while running {
         use glutin::WindowEvent::*;
         events_loop.poll_events(|event| {
             match event {
                 glutin::Event::WindowEvent { window_id: _, event } => match event {
                     KeyboardInput { device_id: _, input } => {
-                        dbg!(input);
+                        // dbg!(input);
+                    },
+                    MouseInput {..} => {},
+                    CursorMoved {
+                        device_id: _,
+                        position: glutin::dpi::LogicalPosition{ x, y },
+                        modifiers: _ 
+                    } => {
+                        println!("x: {}, y: {}", x, y);
                     },
                     CloseRequested => { 
                         println!("close requested");
@@ -88,17 +113,12 @@ pub fn main() {
         });
 
         encoder.clear(&data.out, BLACK);
+        let _ = encoder.update_buffer(&data.transform, &[mat], 0);
         encoder.draw(&slice, &pso, &data);
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
-        // device.cleanup();
+        device.cleanup();
 
-        frame_count += 1;
-        let now = std::time::Instant::now();
-        if now >= next_time {
-            println!("fps: {}", frame_count - prev_frame_count);
-            prev_frame_count = frame_count;
-            next_time += std::time::Duration::from_secs(1);
-        }
+        frame_count.update();
     }
 }
